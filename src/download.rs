@@ -23,7 +23,7 @@ use crate::utils;
 
 pub const PARALLEL_SIZE: usize = 3 * 1024 * 1024;
 pub const RE_CONNECT_SIZE: usize = 1 * 1024 * 1024;
-pub const TIMEOUT: usize = 6000;
+pub const TIMEOUT: usize = 16000;
 pub const RETRY: usize = 3;
 const SPEED_SAMPLING: usize = 5;
 const PARALLEL_CHECK_INTERVAL: u64 = 3000;
@@ -71,9 +71,7 @@ impl Download {
         let mut buf = segments.as_slice();
         while buf.len() >= 2 * (u64::BITS / u8::BITS) as usize {
             let start = buf.get_u64_le();
-            buf.advance((u64::BITS / 8) as usize);
             let end = buf.get_u64_le();
-            buf.advance((u64::BITS / 8) as usize);
             seg.push((Range { start, end }, false));
         }
         Share::new(Self {
@@ -170,7 +168,7 @@ impl Download {
             };
             match req.set_timeout(d.info.timeout as u64).send().await {
                 Ok(resp) => {
-                    println!("resp!==========code:{:?} len:{:?}", resp.get_status(), resp.get_body_len());
+                    // println!("resp!==========code:{:?} len:{:?}", resp.get_status(), resp.get_body_len());
                     // TODO If-Range 和 Etag的匹配， 处理301和302
                     let status = resp.get_status();
                     if status == 200 {
@@ -432,7 +430,7 @@ impl Download {
                 s.0.start
                     .to_le_bytes()
                     .into_iter()
-                    .chain(s.0.end.to_be_bytes().into_iter())
+                    .chain(s.0.end.to_le_bytes().into_iter())
             })
             .collect()
     }
@@ -529,6 +527,17 @@ impl Info {
             re_connect_size: RE_CONNECT_SIZE,
             timeout: TIMEOUT,
             retry: RETRY,
+        }
+    }
+    pub fn with_config(url: String, size: Option<u64>, timeout: usize, retry: usize) -> Self {
+        Self {
+            url,
+            sign: Default::default(),
+            size,
+            parallel_size: PARALLEL_SIZE,
+            re_connect_size: RE_CONNECT_SIZE,
+            timeout,
+            retry,
         }
     }
 }

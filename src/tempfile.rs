@@ -89,7 +89,7 @@ impl TempFile {
         // 创建句柄
         let temp_file_handle = SafeFile::open(temp_file.clone(), AsyncFileOptions::OnlyWrite).await?;
         // 创建句柄
-        let seg_file_handle = SafeFile::open(seg_file.clone(), AsyncFileOptions::TruncateReadWrite).await?;
+        let seg_file_handle = SafeFile::open(seg_file.clone(), AsyncFileOptions::ReadWrite).await?;
         let file = TempFile {
             info,
             temp_file,
