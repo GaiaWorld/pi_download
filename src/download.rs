@@ -355,6 +355,11 @@ impl Download {
         let mut state = self.state.lock();
         state.segments[0] = (0..size, true);
     }
+    /// 获得文件大小
+    pub fn file_size(&self) -> Option<u64>{
+        let state = self.state.lock();
+        state.file_size()
+    }
     /// 获得查询所对应的当前的范围
     fn get_range(&self) -> Range<u64> {
         let mut state = self.state.lock();
@@ -606,6 +611,13 @@ impl State {
         }
         n
     }
+    /// 获得文件大小
+    pub fn file_size(&self) -> Option<u64>{
+        if self.segments.len() == 0 {
+            return None
+        }
+        Some(self.segments[self.segments.len() - 1].0.end)
+    }
     /// 下载失败， 取消下载标识，返回正在下载的分段数
     fn down_err(&mut self, r: &Range<u64>) -> usize {
         let mut n = 0;
@@ -745,51 +757,53 @@ mod test_mod {
     use crate::download::*;
     use crate::tempfile::FileInfo;
     use async_httpc::AsyncHttpcBuilder;
+    use std::sync::RwLock;
     use pi_async::rt::multi_thread::{
         MultiTaskRuntime, MultiTaskRuntimeBuilder, StealableTaskPool,
     };
     use pi_async::rt::AsyncRuntime;
     use std::path::PathBuf;
-    use std::time::Duration;
+    use std::sync::Arc;
+    use std::sync::atomic::AtomicU64;
+    use std::time::{Duration, Instant};
 
     use std::time::{SystemTime, UNIX_EPOCH};
 
     #[derive(Clone)]
-    struct G(MultiTaskRuntime<()>);
+    struct G(Arc<RwLock<Instant>>);
 
     impl Notify for G {
         fn notify(&self, d: &Share<Download>, result: &IoResult<()>) {
             let s = d.get_state();
             if s.is_running() {
-                if s.load_size > 10015583 {
-                    //panic!("Download")
+                let time = {self.0.read().unwrap().elapsed().as_millis()};
+
+                if time > 1000 {
+                    *self.0.write().unwrap() = Instant::now();
+                    println!("notify:----------r:{:?} , load:{}, down:{}, file_size:{:?}", result, s.load_size, s.down_size, s.file_size());
                 }
                 return;
             }
-            println!("notify:----------r:{:?} retry:{}, speed:{} parallel:{} running:{} load:{}, down:{}", result, d.get_retry_count(), s.speed(), s.parallel(), s.is_running(), s.load_size, s.down_size);
+            
         }
     }
     #[test]
     pub fn test() {
         let pool = MultiTaskRuntimeBuilder::default();
         let rt0 = pool.build();
-        let rt1 = rt0.clone();
-        let seed = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
-        println!("---------------seed:{:?}", seed);
+        // let rt1 = rt0.clone();
+
 
         let _ = rt0.spawn(rt0.alloc(), async move {
             let cur = std::env::current_dir().unwrap();
             let (file, seg) = TempFile::open(FileInfo { dir: cur, file: PathBuf::from("test.exe"), temp_dir: PathBuf::from(""), data_limit: 10 * 1024 }).await.unwrap();
             println!("reload file:{:?}, seg:{:?}", file, seg);
-            let d = Download::down_file(Info::new("http://yxzgcs.17youx.cn:15011/test.exe".to_string()), file, seg, Value::Null);
-            let _ = match Download::start::<StealableTaskPool<()>, _>(&d, AsyncHttpcBuilder::new().build().unwrap(), G(rt1)).await {
+            let d = Download::down_file(Info::with_config("https://pi-client-cfg.oss-cn-chengdu.aliyuncs.com/exes/test.exe".to_string(), None, 100 * 1000, 3), file, seg, Value::Null);
+            let r = match Download::start::<StealableTaskPool<()>, _>(&d, AsyncHttpcBuilder::new().build().unwrap(), G(Arc::new(RwLock::new (Instant::now())))).await {
                 Ok(_) => Ok(()),
                 Err(r) => Err(r),
             };
-            println!("----OK: {:?}", d);
+            println!("----r: {:?}", r);
         });
         std::thread::sleep(Duration::from_millis(100000000));
     }
