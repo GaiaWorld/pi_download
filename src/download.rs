@@ -168,7 +168,11 @@ impl Download {
             };
             match req.set_timeout(d.info.timeout as u64).send().await {
                 Ok(resp) => {
-                    // println!("resp!==========code:{:?} len:{:?}", resp.get_status(), resp.get_body_len());
+                    println!(
+                        "resp!==========code:{:?} len:{:?}",
+                        resp.get_status(),
+                        resp.get_body_len()
+                    );
                     // TODO If-Range 和 Etag的匹配， 处理301和302
                     let status = resp.get_status();
                     if status == 200 {
@@ -191,6 +195,9 @@ impl Download {
                     }
                     if range.end == u64::MAX {
                         // 如果是初次下载，则进行长度检查
+                        println!("get_body_len: range: {:?}", range);
+                        let encoding = resp.get_headers("content-encoding");
+                        println!("======content-encoding: {:?}", encoding);
                         if let Some(body_len) = resp.get_body_len() {
                             if let Some(size) = d.info.size {
                                 if body_len != size {
@@ -200,6 +207,7 @@ impl Download {
                                     ));
                                 }
                             }
+                            println!("get_body_len: body_len: {:?}", body_len);
                             // 修正范围大小
                             d.set_range(body_len)
                         }
@@ -356,7 +364,7 @@ impl Download {
         state.segments[0] = (0..size, true);
     }
     /// 获得文件大小
-    pub fn file_size(&self) -> Option<u64>{
+    pub fn file_size(&self) -> Option<u64> {
         let state = self.state.lock();
         state.file_size()
     }
@@ -612,9 +620,9 @@ impl State {
         n
     }
     /// 获得文件大小
-    pub fn file_size(&self) -> Option<u64>{
+    pub fn file_size(&self) -> Option<u64> {
         if self.segments.len() == 0 {
-            return None
+            return None;
         }
         Some(self.segments[self.segments.len() - 1].0.end)
     }
@@ -707,6 +715,7 @@ impl State {
         }
         // 如果最大块足够大，可以继续分段下载，则劈分该块
         let mut r = self.segments[index].0.clone();
+        println!("========= r: {:?}", r);
         let split = (r.start + r.end) / 2;
         self.segments[index].0.end = split;
         r.start = split;
@@ -757,14 +766,14 @@ mod test_mod {
     use crate::download::*;
     use crate::tempfile::FileInfo;
     use async_httpc::AsyncHttpcBuilder;
-    use std::sync::RwLock;
     use pi_async::rt::multi_thread::{
         MultiTaskRuntime, MultiTaskRuntimeBuilder, StealableTaskPool,
     };
     use pi_async::rt::AsyncRuntime;
     use std::path::PathBuf;
-    use std::sync::Arc;
     use std::sync::atomic::AtomicU64;
+    use std::sync::Arc;
+    use std::sync::RwLock;
     use std::time::{Duration, Instant};
 
     use std::time::{SystemTime, UNIX_EPOCH};
@@ -776,15 +785,20 @@ mod test_mod {
         fn notify(&self, d: &Share<Download>, result: &IoResult<()>) {
             let s = d.get_state();
             if s.is_running() {
-                let time = {self.0.read().unwrap().elapsed().as_millis()};
+                let time = { self.0.read().unwrap().elapsed().as_millis() };
 
                 if time > 1000 {
                     *self.0.write().unwrap() = Instant::now();
-                    println!("notify:----------r:{:?} , load:{}, down:{}, file_size:{:?}", result, s.load_size, s.down_size, s.file_size());
+                    println!(
+                        "notify:----------r:{:?} , load:{}, down:{}, file_size:{:?}",
+                        result,
+                        s.load_size,
+                        s.down_size,
+                        s.file_size()
+                    );
                 }
                 return;
             }
-            
         }
     }
     #[test]
@@ -793,13 +807,40 @@ mod test_mod {
         let rt0 = pool.build();
         // let rt1 = rt0.clone();
 
-
         let _ = rt0.spawn(rt0.alloc(), async move {
             let cur = std::env::current_dir().unwrap();
-            let (file, seg) = TempFile::open(FileInfo { dir: cur, file: PathBuf::from("test.exe"), temp_dir: PathBuf::from(""), data_limit: 10 * 1024 }).await.unwrap();
+            let (file, seg) = TempFile::open(FileInfo {
+                dir: cur,
+                file: PathBuf::from("test.exe"),
+                temp_dir: PathBuf::from(""),
+                data_limit: 10 * 1024,
+            })
+            .await
+            .unwrap();
             println!("reload file:{:?}, seg:{:?}", file, seg);
-            let d = Download::down_file(Info::with_config("https://pi-client-cfg.oss-cn-chengdu.aliyuncs.com/exes/test.exe".to_string(), None, 100 * 1000, 3), file, seg, Value::Null);
-            let r = match Download::start::<StealableTaskPool<()>, _>(&d, AsyncHttpcBuilder::new().build().unwrap(), G(Arc::new(RwLock::new (Instant::now())))).await {
+            let d = Download::down_file(
+                Info::with_config(
+                    "http://192.168.35.47:81/assets_server_win/sys/PBzSZXFUqyfirCR9KBBmie".to_string(),
+                    None,
+                    100 * 1000,
+                    3,
+                ),
+                file,
+                seg,
+                Value::Null,
+            );
+            let r = match Download::start::<StealableTaskPool<()>, _>(
+                &d,
+                AsyncHttpcBuilder::new()
+                    .enable_gzip(false)
+                    .enable_brotli(false)
+                    .enable_deflate(false)
+                    .build()
+                    .unwrap(),
+                G(Arc::new(RwLock::new(Instant::now()))),
+            )
+            .await
+            {
                 Ok(_) => Ok(()),
                 Err(r) => Err(r),
             };
