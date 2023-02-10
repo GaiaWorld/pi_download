@@ -811,7 +811,7 @@ mod test_mod {
             let cur = std::env::current_dir().unwrap();
             let (file, seg) = TempFile::open(FileInfo {
                 dir: cur,
-                file: PathBuf::from("test.exe"),
+                file: PathBuf::from("test.apk"),
                 temp_dir: PathBuf::from(""),
                 data_limit: 10 * 1024,
             })
@@ -820,7 +820,8 @@ mod test_mod {
             println!("reload file:{:?}, seg:{:?}", file, seg);
             let d = Download::down_file(
                 Info::with_config(
-                    "http://192.168.35.47:81/assets_server_win/sys/PBzSZXFUqyfirCR9KBBmie".to_string(),
+                    "https://fruit.17youx.cn/com_fruits_majiang_test_1_0_2.apk
+                    ".to_string(),
                     None,
                     100 * 1000,
                     3,
