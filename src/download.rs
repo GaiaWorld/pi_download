@@ -178,7 +178,18 @@ impl Download {
                     if status == 200 {
                         // TODO 如果不支持206，则顺序下载
                     } else if status == 206 {
-                    } else {
+                    }
+                     else if status >=300 && status < 500 {
+                        // 重定向消息（300 – 399）和客户端错误响应（400 – 499）， 无需再尝试， 直接将尝试次数置为最大
+                        d.retry_count.fetch_add(d.info.retry, Ordering::SeqCst);
+                        let (_, sender) = d.down_err(&range);
+                        let e = Error::new(
+                            ErrorKind::Other,
+                            format!("request fail, status: {:?}", status),
+                        );
+                        return over(sender, Err(e)).await;
+                    } 
+                    else {
                         if let Some(r) = Download::error(
                             &d,
                             &range,
