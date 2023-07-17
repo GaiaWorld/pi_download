@@ -1,6 +1,6 @@
 [package]
 name = "pi_download"
-version = "0.1.1"
+version = "0.1.2"
 authors = ["zmax <zmax@gaia.world>"]
 edition = "2021"
 description = "multi parts download, disconnect to continue connection, redundant download"
@@ -14,7 +14,7 @@ repository = "https://github.com/GaiaWorld/pi_download"
 [dependencies]
 bytes="1.1"
 log = "0.4"
-pi_time = "0.1"
+pi_time = "0.3"
 pi_hash = "0.1"
 pi_share = "0.4"
 pi_async = "0.5"
