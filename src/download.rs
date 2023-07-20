@@ -6,7 +6,7 @@ use bytes::Buf;
 use flume::{bounded, Sender};
 use futures::future::BoxFuture;
 use futures::FutureExt;
-use pi_async::rt::{local_async_runtime, spawn_local, AsyncTaskPool, AsyncTaskPoolExt};
+use pi_async_rt::rt::{local_async_runtime, spawn_local, AsyncTaskPool, AsyncTaskPoolExt};
 use pi_enum_default_macro::EnumDefault;
 use pi_share::{Share, ShareMutex, ShareUsize};
 use pi_time::now_millisecond;
@@ -777,10 +777,10 @@ mod test_mod {
     use crate::download::*;
     use crate::tempfile::FileInfo;
     use async_httpc::AsyncHttpcBuilder;
-    use pi_async::rt::multi_thread::{
+    use pi_async_rt::rt::multi_thread::{
         MultiTaskRuntime, MultiTaskRuntimeBuilder, StealableTaskPool,
     };
-    use pi_async::rt::AsyncRuntime;
+    use pi_async_rt::rt::AsyncRuntime;
     use std::path::PathBuf;
     use std::sync::atomic::AtomicU64;
     use std::sync::Arc;
@@ -818,7 +818,7 @@ mod test_mod {
         let rt0 = pool.build();
         // let rt1 = rt0.clone();
 
-        let _ = rt0.spawn(rt0.alloc(), async move {
+        let _ = rt0.spawn( async move {
             let cur = std::env::current_dir().unwrap();
             let (file, seg) = TempFile::open(FileInfo {
                 dir: cur,
