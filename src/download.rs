@@ -90,7 +90,7 @@ impl Download {
         Download::new(info, Storage::Mem(Default::default()), segments, link)
     }
     pub fn get_state(&self) -> State {
-        self.state.lock().clone()
+        self.state.lock().unwrap().clone()
     }
     pub fn get_retry_count(&self) -> usize {
         self.retry_count.load(Ordering::Relaxed)
@@ -100,7 +100,7 @@ impl Download {
     }
     pub async fn stop(&self, e: Error) -> IoResult<()> {
         let s = {
-            let mut s = self.state.lock();
+            let mut s = self.state.lock().unwrap();
             s.sender.take()
         };
         over(s, Err(e)).await
@@ -111,7 +111,7 @@ impl Download {
         notify: T,
     ) -> IoResult<()> {
         let receiver = {
-            let mut s = d.state.lock();
+            let mut s = d.state.lock().unwrap();
             if s.sender.is_some() {
                 return Err(io::Error::new(io::ErrorKind::Other, "invalid status"));
             }
@@ -371,22 +371,22 @@ impl Download {
     }
     /// 初次下载，设置文件范围大小
     fn set_range(&self, size: u64) {
-        let mut state = self.state.lock();
+        let mut state = self.state.lock().unwrap();
         state.segments[0] = (0..size, true);
     }
     /// 获得文件大小
     pub fn file_size(&self) -> Option<u64> {
-        let state = self.state.lock();
+        let state = self.state.lock().unwrap();
         state.file_size()
     }
     /// 获得查询所对应的当前的范围
     fn get_range(&self) -> Range<u64> {
-        let mut state = self.state.lock();
+        let mut state = self.state.lock().unwrap();
         state.get_range(self.info.parallel_size)
     }
     // 下载失败， 取消下载标识，返回是否停止请求
     fn down_err(&self, r: &Range<u64>) -> (Option<bool>, Option<Sender<IoResult<()>>>) {
-        let mut state = self.state.lock();
+        let mut state = self.state.lock().unwrap();
         if state.sender.is_none() {
             // 下载已经结束
             return (None, None);
@@ -407,7 +407,7 @@ impl Download {
     }
     // 下载成功，返回usize::MAX表示已经结束， 返回0表示继续， 返回非0表示数据需要被截断并停止
     fn down_ok(&self, r: &Range<u64>, data_len: usize) -> usize {
-        let mut state = self.state.lock();
+        let mut state = self.state.lock().unwrap();
         if state.sender.is_none() {
             return usize::MAX;
         }
@@ -415,7 +415,7 @@ impl Download {
     }
     // 判断是否结束， 如果结束，则尝试获取Sender
     fn over_sender(&self) -> Option<Sender<IoResult<()>>> {
-        let mut state = self.state.lock();
+        let mut state = self.state.lock().unwrap();
         if state.parallel() == 0 {
             state.sender.take()
         } else {
@@ -425,7 +425,7 @@ impl Download {
     // 判断是否增加新的下载
     fn can_parallel(&self) -> bool {
         let now = now_millisecond();
-        let mut state = self.state.lock();
+        let mut state = self.state.lock().unwrap();
         if state.segments.len() == 1 {
             state.last_check_time = now + PARALLEL_CHECK_INTERVAL;
             // 如果只有一个下载， 并且有body_len，则新增下载
@@ -446,7 +446,7 @@ impl Download {
     }
     // 获得分段信息
     fn get_segments(&self) -> Vec<u8> {
-        let state = self.state.lock();
+        let state = self.state.lock().unwrap();
         state
             .segments
             .iter()
@@ -470,7 +470,7 @@ impl fmt::Debug for Storage {
         match self {
             Storage::File(file) => write!(f, "Storage::File({:?})", file),
             Storage::Mem(v) => {
-                let len = { v.lock().len() };
+                let len = { v.lock().unwrap().len() };
                 write!(f, "Storage::Mem(Vec({}))", len)
             }
         }
@@ -487,7 +487,7 @@ impl Storage {
         match &self {
             Storage::File(file) => file.take().await,
             Storage::Mem(mutex) => {
-                let mut vec = mutex.lock();
+                let mut vec = mutex.lock().unwrap();
                 Ok(mem::replace(&mut vec, vec![]))
             }
         }
@@ -510,7 +510,7 @@ impl Storage {
                 }
             }
             Storage::Mem(mutex) => {
-                let mut vec = mutex.lock();
+                let mut vec = mutex.lock().unwrap();
                 utils::write(&mut vec, pos as usize, &buf[..buf_len], 0);
                 Ok(())
             }
@@ -778,16 +778,13 @@ mod test_mod {
     use crate::tempfile::FileInfo;
     use async_httpc::AsyncHttpcBuilder;
     use pi_async_rt::rt::multi_thread::{
-        MultiTaskRuntime, MultiTaskRuntimeBuilder, StealableTaskPool,
+        MultiTaskRuntimeBuilder, StealableTaskPool,
     };
     use pi_async_rt::rt::AsyncRuntime;
     use std::path::PathBuf;
-    use std::sync::atomic::AtomicU64;
     use std::sync::Arc;
     use std::sync::RwLock;
     use std::time::{Duration, Instant};
-
-    use std::time::{SystemTime, UNIX_EPOCH};
 
     #[derive(Clone)]
     struct G(Arc<RwLock<Instant>>);

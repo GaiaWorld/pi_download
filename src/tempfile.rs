@@ -9,7 +9,7 @@ use std::ffi::OsString;
 use std::mem;
 use std::{path::PathBuf, sync::Arc};
 use std::io::{ Result as IoResult, ErrorKind, Error};
-use pi_share::{ShareMutex};
+use pi_share::ShareMutex;
 use pi_async_file::file::{WriteOptions, AsyncFileOptions};
 use pi_rt_file::{SafeFile, remove_file, rename};
 
@@ -55,7 +55,7 @@ pub struct TempFile {
 impl fmt::Debug for TempFile {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let pos_len = {
-            let data = self.data.lock();
+            let data = self.data.lock().unwrap();
             (data.0, data.1.len())
         };
         f.debug_struct("TempFile").field("info", &self.info).field("data", &pos_len).finish()
@@ -116,7 +116,7 @@ impl TempFile {
     pub async fn write_data(&self, pos: u64, buf: Box<[u8]>, len: usize) -> IoResult<()> {
         {
             // 内存缓存
-            let mut data = self.data.lock();
+            let mut data = self.data.lock().unwrap();
             if data.1.len() == 0 {
                 // 第一次写入
                 // 记录起始位置
@@ -153,7 +153,7 @@ impl TempFile {
             ))
         }
         let meta = file.metadata()?;
-        let mut data = self.data.lock();
+        let mut data = self.data.lock().unwrap();
         if data.0 == 0 && data.1.len() as u64 == meta.len() {
             return Ok(mem::replace(&mut data.1, vec![]))
         }
