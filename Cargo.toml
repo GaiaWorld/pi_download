@@ -1,6 +1,6 @@
 [package]
 name = "pi_download"
-version = "0.2.1"
+version = "0.3.0"
 authors = ["zmax <zmax@gaia.world>"]
 edition = "2021"
 description = "multi parts download, disconnect to continue connection, redundant download"
@@ -18,10 +18,10 @@ pi_time = "0.3"
 pi_hash = "0.1"
 pi_share = "0.4"
 pi-async-rt = "0.1"
-pi_rt_file = "0.3"
-pi_async_file = "0.5"
+pi_rt_file = "0.4"
+pi_async_file = "0.6"
 futures = "0.3"
-flume = "0.10"
+flume = "0.11"
 pi_enum_default_macro ="0.1"
 serde = {version = "1.0", features=["serde_derive"]}
 serde_json = "1.0"
